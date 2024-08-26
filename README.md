@@ -14,3 +14,10 @@ It controls the swap between Varas and the tokens specified on VFT contract.
 3. In the vft contract you need to grant admin, burn and minter role to the mini_dexs contract.
 4. With that, you can swap Varas and your tokens!
 
+## Try ut on gitpod!
+
+<p align="center">
+  <a href="https://gitpod.io/#https://github.com/Vara-Lab/VFT-Manager-Template" target="_blank">
+    <img src="https://gitpod.io/button/open-in-gitpod.svg" width="240" alt="Gitpod">
+  </a>
+</p>

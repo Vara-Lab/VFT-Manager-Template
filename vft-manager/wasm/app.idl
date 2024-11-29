@@ -39,15 +39,29 @@ constructor {
 };
 
 service MiniDeXs {
+  /// ## Add an amount of tokens to the vft contract for this contract
+  /// Only the contract owner can perform this action
   AddTokensToContract : (tokens_to_add: u128) -> MiniDexsEvents;
+  /// ## Change the minimum number of tokens to add to the contract
+  /// Only the contract owner can perform this action
   SetMinTokensToAdd : (min_tokens_to_add: u128) -> MiniDexsEvents;
+  /// ## Change the number of tokens to exchange for one rod
+  /// Only the contract owner can perform this action
   SetTokensPerVara : (tokens_per_vara: u128) -> MiniDexsEvents;
+  /// ## Change vft contract id
+  /// Only the contract owner can perform this action
   SetVftContractId : (vft_contract_id: actor_id) -> MiniDexsEvents;
+  /// ## Swap Varas for tokens
+  /// Receive a certain amount of varas and then make a swap for a certain number of tokens
   SwapTokensByNumOfVaras : () -> MiniDexsEvents;
+  /// ## Swap tokens for Varas
   SwapTokensToVaras : (amount_of_tokens: u128) -> MiniDexsEvents;
+  /// ## Varas stored in contract
   query ContractTotalVarasStored : () -> MiniDexsQueryEvents;
   query TokensToSwapOneVara : () -> MiniDexsQueryEvents;
+  /// ## Returns the total number of tokens in the contract (In U256 format)
   query TotalTokensToSwap : () -> MiniDexsQueryEvents;
+  /// ## Returns the total number of tokens in the contract (In u128 format)
   query TotalTokensToSwapAsU128 : () -> MiniDexsQueryEvents;
 };
 

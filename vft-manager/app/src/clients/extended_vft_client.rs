@@ -26,6 +26,7 @@ impl<R: Remoting + Clone> traits::ExtendedVftFactory for ExtendedVftFactory<R> {
         )
     }
 }
+
 pub mod extended_vft_factory {
     use super::*;
     pub mod io {
@@ -129,8 +130,10 @@ impl<R: Remoting + Clone> traits::Vft for Vft<R> {
         RemotingAction::<_, vft::io::TotalSupply>::new(self.remoting.clone(), ())
     }
 }
+
 pub mod vft {
     use super::*;
+
     pub mod io {
         use super::*;
         use sails_rs::calls::ActionIo;
@@ -402,6 +405,7 @@ pub mod vft {
             type Reply = U256;
         }
     }
+
     #[allow(dead_code)]
     #[cfg(not(target_arch = "wasm32"))]
     pub mod events {
@@ -444,6 +448,7 @@ pub mod vft {
         }
     }
 }
+
 pub mod traits {
     use super::*;
     #[allow(dead_code)]
@@ -458,6 +463,7 @@ pub mod traits {
             decimals: u8,
         ) -> impl Activation<Args = Self::Args>;
     }
+
     #[allow(clippy::type_complexity)]
     pub trait Vft {
         type Args;

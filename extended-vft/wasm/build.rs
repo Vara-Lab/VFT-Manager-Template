@@ -1,20 +1,35 @@
 use extended_vft_app::Program;
-use std::{env, path::PathBuf};
+use sails_client_gen::ClientGenerator;
+use std::{env, path::PathBuf, fs};
 
 fn main() {
-    gwasm_builder::build();
+    // Build contract to get .opt.wasm
+    sails_rs::build_wasm();
 
-    let idl_file_path =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("extended_vft.idl");
+    // Path where the file "Cargo.toml" is located (points to the root of the project)
+    // 'CARGO_MANIFEST_DIR' specifies this directory in en::var
+    let cargo_toml_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
-    // Generate IDL file for the app
-    sails_idl_gen::generate_idl_to_file::<Program>(&idl_file_path).unwrap();
+    // Path where the client will be generated 
+    // 'OUT_DIR' points to a temporary directory used by the compiler 
+    // to store files generated at compile time. 
+    let outdir_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    // Generate client code from IDL file
-    sails_client_gen::generate_client_from_idl(
-        &idl_file_path,
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("extended_vft_client.rs"),
-        None,
-    )
-    .unwrap();
+    // Path where the file "app.idl" will be created
+    let idl_path = cargo_toml_path.clone().join("extended_vft.idl");
+    let client_path = outdir_path.clone().join("extended_vft_client.rs");
+
+    // This generate the contract IDL
+    sails_idl_gen::generate_idl_to_file::<Program>(idl_path.clone())
+        .unwrap();
+
+    // Generator of the clients of the contract
+    ClientGenerator::from_idl_path(&idl_path)
+        .generate_to(client_path.clone())
+        .unwrap();
+
+    // Then, copies the client that is in the OUT_DIR path in the current directory (wasm), where the 
+    // "Cargo.toml" file is located 
+    fs::copy(client_path, cargo_toml_path.join("extended_vft_client.rs"))
+        .unwrap();
 }

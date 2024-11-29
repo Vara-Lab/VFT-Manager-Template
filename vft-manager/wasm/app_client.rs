@@ -34,6 +34,7 @@ impl<R: Remoting + Clone> traits::AppFactory for AppFactory<R> {
         )
     }
 }
+
 pub mod app_factory {
     use super::*;
     pub mod io {
@@ -83,6 +84,8 @@ impl<R> MiniDeXs<R> {
 }
 impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
     type Args = R::Args;
+    /// ## Add an amount of tokens to the vft contract for this contract
+    /// Only the contract owner can perform this action
     fn add_tokens_to_contract(
         &mut self,
         tokens_to_add: u128,
@@ -92,6 +95,8 @@ impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
             tokens_to_add,
         )
     }
+    /// ## Change the minimum number of tokens to add to the contract
+    /// Only the contract owner can perform this action
     fn set_min_tokens_to_add(
         &mut self,
         min_tokens_to_add: u128,
@@ -101,6 +106,8 @@ impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
             min_tokens_to_add,
         )
     }
+    /// ## Change the number of tokens to exchange for one rod
+    /// Only the contract owner can perform this action
     fn set_tokens_per_vara(
         &mut self,
         tokens_per_vara: u128,
@@ -110,6 +117,8 @@ impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
             tokens_per_vara,
         )
     }
+    /// ## Change vft contract id
+    /// Only the contract owner can perform this action
     fn set_vft_contract_id(
         &mut self,
         vft_contract_id: ActorId,
@@ -119,11 +128,14 @@ impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
             vft_contract_id,
         )
     }
+    /// ## Swap Varas for tokens
+    /// Receive a certain amount of varas and then make a swap for a certain number of tokens
     fn swap_tokens_by_num_of_varas(
         &mut self,
     ) -> impl Call<Output = MiniDexsEvents, Args = R::Args> {
         RemotingAction::<_, mini_de_xs::io::SwapTokensByNumOfVaras>::new(self.remoting.clone(), ())
     }
+    /// ## Swap tokens for Varas
     fn swap_tokens_to_varas(
         &mut self,
         amount_of_tokens: u128,
@@ -133,6 +145,7 @@ impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
             amount_of_tokens,
         )
     }
+    /// ## Varas stored in contract
     fn contract_total_varas_stored(
         &self,
     ) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
@@ -144,17 +157,21 @@ impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
     fn tokens_to_swap_one_vara(&self) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
         RemotingAction::<_, mini_de_xs::io::TokensToSwapOneVara>::new(self.remoting.clone(), ())
     }
+    /// ## Returns the total number of tokens in the contract (In U256 format)
     fn total_tokens_to_swap(&self) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
         RemotingAction::<_, mini_de_xs::io::TotalTokensToSwap>::new(self.remoting.clone(), ())
     }
+    /// ## Returns the total number of tokens in the contract (In u128 format)
     fn total_tokens_to_swap_as_u_128(
         &self,
     ) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
         RemotingAction::<_, mini_de_xs::io::TotalTokensToSwapAsU128>::new(self.remoting.clone(), ())
     }
 }
+
 pub mod mini_de_xs {
     use super::*;
+
     pub mod io {
         use super::*;
         use sails_rs::calls::ActionIo;
@@ -310,7 +327,7 @@ pub mod mini_de_xs {
         }
     }
 }
-#[derive(PartialEq, Debug, Encode, Decode, TypeInfo)]
+#[derive(PartialEq, Clone, Debug, Encode, Decode, TypeInfo)]
 #[codec(crate = sails_rs::scale_codec)]
 #[scale_info(crate = sails_rs::scale_info)]
 pub enum MiniDexsEvents {
@@ -326,7 +343,7 @@ pub enum MiniDexsEvents {
     },
     Error(MiniDexsErrors),
 }
-#[derive(PartialEq, Debug, Encode, Decode, TypeInfo)]
+#[derive(PartialEq, Clone, Debug, Encode, Decode, TypeInfo)]
 #[codec(crate = sails_rs::scale_codec)]
 #[scale_info(crate = sails_rs::scale_info)]
 pub enum MiniDexsErrors {
@@ -349,7 +366,7 @@ pub enum MiniDexsErrors {
     ErrorInGetNumOfVarasToSwap,
     OperationWasNotPerformed,
 }
-#[derive(PartialEq, Debug, Encode, Decode, TypeInfo)]
+#[derive(PartialEq, Clone, Debug, Encode, Decode, TypeInfo)]
 #[codec(crate = sails_rs::scale_codec)]
 #[scale_info(crate = sails_rs::scale_info)]
 pub enum MiniDexsQueryEvents {
@@ -362,6 +379,7 @@ pub enum MiniDexsQueryEvents {
     NumOfTokensForOneVara(u128),
     Error(MiniDexsErrors),
 }
+
 pub mod traits {
     use super::*;
     #[allow(dead_code)]
@@ -377,6 +395,7 @@ pub mod traits {
             tokens_per_vara: u128,
         ) -> impl Activation<Args = Self::Args>;
     }
+
     #[allow(clippy::type_complexity)]
     pub trait MiniDeXs {
         type Args;
@@ -416,14 +435,4 @@ pub mod traits {
             &self,
         ) -> impl Query<Output = MiniDexsQueryEvents, Args = Self::Args>;
     }
-}
-#[cfg(feature = "with_mocks")]
-#[cfg(not(target_arch = "wasm32"))]
-extern crate std;
-#[cfg(feature = "with_mocks")]
-#[cfg(not(target_arch = "wasm32"))]
-pub mod mockall {
-    use super::*;
-    use sails_rs::mockall::*;
-    mock! { pub MiniDeXs<A> {} #[allow(refining_impl_trait)] #[allow(clippy::type_complexity)] impl<A> traits::MiniDeXs for MiniDeXs<A> { type Args = A; fn add_tokens_to_contract (&mut self, tokens_to_add: u128,) -> MockCall<A, MiniDexsEvents>;fn set_min_tokens_to_add (&mut self, min_tokens_to_add: u128,) -> MockCall<A, MiniDexsEvents>;fn set_tokens_per_vara (&mut self, tokens_per_vara: u128,) -> MockCall<A, MiniDexsEvents>;fn set_vft_contract_id (&mut self, vft_contract_id: ActorId,) -> MockCall<A, MiniDexsEvents>;fn swap_tokens_by_num_of_varas (&mut self, ) -> MockCall<A, MiniDexsEvents>;fn swap_tokens_to_varas (&mut self, amount_of_tokens: u128,) -> MockCall<A, MiniDexsEvents>;fn contract_total_varas_stored (& self, ) -> MockQuery<A, MiniDexsQueryEvents>;fn tokens_to_swap_one_vara (& self, ) -> MockQuery<A, MiniDexsQueryEvents>;fn total_tokens_to_swap (& self, ) -> MockQuery<A, MiniDexsQueryEvents>;fn total_tokens_to_swap_as_u_128 (& self, ) -> MockQuery<A, MiniDexsQueryEvents>; } }
 }

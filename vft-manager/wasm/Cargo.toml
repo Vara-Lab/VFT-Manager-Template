@@ -8,7 +8,7 @@ license.workspace = true
 app = { path = "../app" }
 
 [build-dependencies]
-gear-wasm-builder.workspace = true
 sails-idl-gen.workspace = true
 sails-client-gen.workspace = true
+sails-rs = { workspace = true, features = ["wasm-builder"] }
 app = { path = "../app" }

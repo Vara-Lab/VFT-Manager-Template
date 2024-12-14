@@ -37,7 +37,6 @@ pub fn burn(
     if value.is_zero() {
         return Ok(false);
     }
-
     let new_total_supply = total_supply.checked_sub(value).ok_or(Error::Underflow)?;
 
     let new_from = funcs::balance_of(balances, from)
@@ -51,6 +50,5 @@ pub fn burn(
     }
 
     *total_supply = new_total_supply;
-
     Ok(true)
 }

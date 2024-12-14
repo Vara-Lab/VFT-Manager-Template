@@ -1,4 +1,4 @@
-use app::MiniDexsProgram;
+use app::VFTManagerProgram;
 use sails_client_gen::ClientGenerator;
 use std::{env, fs, path::PathBuf};
 
@@ -20,7 +20,7 @@ fn main() {
     let client_path = outdir_path.clone().join("app_client.rs");
 
     // This generate the contract IDL
-    sails_idl_gen::generate_idl_to_file::<MiniDexsProgram>(idl_path.clone()).unwrap();
+    sails_idl_gen::generate_idl_to_file::<VFTManagerProgram>(idl_path.clone()).unwrap();
 
     // Generator of the clients of the contract
     ClientGenerator::from_idl_path(&idl_path)

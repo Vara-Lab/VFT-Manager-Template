@@ -26,11 +26,17 @@ impl<R: Remoting + Clone> traits::AppFactory for AppFactory<R> {
         &self,
         vft_contract_id: Option<ActorId>,
         min_tokens_to_add: u128,
+        max_tokens_to_burn: u128,
         tokens_per_vara: u128,
     ) -> impl Activation<Args = R::Args> {
         RemotingAction::<_, app_factory::io::NewWithData>::new(
             self.remoting.clone(),
-            (vft_contract_id, min_tokens_to_add, tokens_per_vara),
+            (
+                vft_contract_id,
+                min_tokens_to_add,
+                max_tokens_to_burn,
+                tokens_per_vara,
+            ),
         )
     }
 }
@@ -58,89 +64,109 @@ pub mod app_factory {
             pub fn encode_call(
                 vft_contract_id: Option<ActorId>,
                 min_tokens_to_add: u128,
+                max_tokens_to_burn: u128,
                 tokens_per_vara: u128,
             ) -> Vec<u8> {
                 <NewWithData as ActionIo>::encode_call(&(
                     vft_contract_id,
                     min_tokens_to_add,
+                    max_tokens_to_burn,
                     tokens_per_vara,
                 ))
             }
         }
         impl ActionIo for NewWithData {
             const ROUTE: &'static [u8] = &[44, 78, 101, 119, 87, 105, 116, 104, 68, 97, 116, 97];
-            type Params = (Option<ActorId>, u128, u128);
+            type Params = (Option<ActorId>, u128, u128, u128);
             type Reply = ();
         }
     }
 }
-pub struct MiniDeXs<R> {
+pub struct VftManager<R> {
     remoting: R,
 }
-impl<R> MiniDeXs<R> {
+impl<R> VftManager<R> {
     pub fn new(remoting: R) -> Self {
         Self { remoting }
     }
 }
-impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
+impl<R: Remoting + Clone> traits::VftManager for VftManager<R> {
     type Args = R::Args;
-    /// ## Add an amount of tokens to the vft contract for this contract
-    /// Only the contract owner can perform this action
+    fn add_admin(
+        &mut self,
+        new_admin_address: ActorId,
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::AddAdmin>::new(
+            self.remoting.clone(),
+            new_admin_address,
+        )
+    }
     fn add_tokens_to_contract(
         &mut self,
         tokens_to_add: u128,
-    ) -> impl Call<Output = MiniDexsEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::AddTokensToContract>::new(
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::AddTokensToContract>::new(
             self.remoting.clone(),
             tokens_to_add,
         )
     }
-    /// ## Change the minimum number of tokens to add to the contract
-    /// Only the contract owner can perform this action
+    fn burn_tokens_from_contract(
+        &mut self,
+        tokens_to_burn: u128,
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::BurnTokensFromContract>::new(
+            self.remoting.clone(),
+            tokens_to_burn,
+        )
+    }
+    fn set_max_tokens_to_burn(
+        &mut self,
+        max_tokens_to_burn: u128,
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::SetMaxTokensToBurn>::new(
+            self.remoting.clone(),
+            max_tokens_to_burn,
+        )
+    }
     fn set_min_tokens_to_add(
         &mut self,
         min_tokens_to_add: u128,
-    ) -> impl Call<Output = MiniDexsEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::SetMinTokensToAdd>::new(
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::SetMinTokensToAdd>::new(
             self.remoting.clone(),
             min_tokens_to_add,
         )
     }
-    /// ## Change the number of tokens to exchange for one rod
-    /// Only the contract owner can perform this action
     fn set_tokens_per_vara(
         &mut self,
         tokens_per_vara: u128,
-    ) -> impl Call<Output = MiniDexsEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::SetTokensPerVara>::new(
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::SetTokensPerVara>::new(
             self.remoting.clone(),
             tokens_per_vara,
         )
     }
-    /// ## Change vft contract id
-    /// Only the contract owner can perform this action
     fn set_vft_contract_id(
         &mut self,
         vft_contract_id: ActorId,
-    ) -> impl Call<Output = MiniDexsEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::SetVftContractId>::new(
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::SetVftContractId>::new(
             self.remoting.clone(),
             vft_contract_id,
         )
     }
-    /// ## Swap Varas for tokens
-    /// Receive a certain amount of varas and then make a swap for a certain number of tokens
     fn swap_tokens_by_num_of_varas(
         &mut self,
-    ) -> impl Call<Output = MiniDexsEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::SwapTokensByNumOfVaras>::new(self.remoting.clone(), ())
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::SwapTokensByNumOfVaras>::new(self.remoting.clone(), ())
     }
     /// ## Swap tokens for Varas
+    /// CommandReply is a helper struct that can bind tokens to the response of the contract
     fn swap_tokens_to_varas(
         &mut self,
         amount_of_tokens: u128,
-    ) -> impl Call<Output = MiniDexsEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::SwapTokensToVaras>::new(
+    ) -> impl Call<Output = VftManagerEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::SwapTokensToVaras>::new(
             self.remoting.clone(),
             amount_of_tokens,
         )
@@ -148,33 +174,54 @@ impl<R: Remoting + Clone> traits::MiniDeXs for MiniDeXs<R> {
     /// ## Varas stored in contract
     fn contract_total_varas_stored(
         &self,
-    ) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::ContractTotalVarasStored>::new(
+    ) -> impl Query<Output = VftManagerQueryEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::ContractTotalVarasStored>::new(
             self.remoting.clone(),
             (),
         )
     }
-    fn tokens_to_swap_one_vara(&self) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::TokensToSwapOneVara>::new(self.remoting.clone(), ())
+    /// ## get the amount of tokens to be able to change to one VARA
+    fn tokens_to_swap_one_vara(
+        &self,
+    ) -> impl Query<Output = VftManagerQueryEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::TokensToSwapOneVara>::new(self.remoting.clone(), ())
     }
     /// ## Returns the total number of tokens in the contract (In U256 format)
-    fn total_tokens_to_swap(&self) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::TotalTokensToSwap>::new(self.remoting.clone(), ())
+    fn total_tokens_to_swap(&self) -> impl Query<Output = VftManagerQueryEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::TotalTokensToSwap>::new(self.remoting.clone(), ())
     }
     /// ## Returns the total number of tokens in the contract (In u128 format)
     fn total_tokens_to_swap_as_u_128(
         &self,
-    ) -> impl Query<Output = MiniDexsQueryEvents, Args = R::Args> {
-        RemotingAction::<_, mini_de_xs::io::TotalTokensToSwapAsU128>::new(self.remoting.clone(), ())
+    ) -> impl Query<Output = VftManagerQueryEvents, Args = R::Args> {
+        RemotingAction::<_, vft_manager::io::TotalTokensToSwapAsU128>::new(
+            self.remoting.clone(),
+            (),
+        )
     }
 }
 
-pub mod mini_de_xs {
+pub mod vft_manager {
     use super::*;
 
     pub mod io {
         use super::*;
         use sails_rs::calls::ActionIo;
+        pub struct AddAdmin(());
+        impl AddAdmin {
+            #[allow(dead_code)]
+            pub fn encode_call(new_admin_address: ActorId) -> Vec<u8> {
+                <AddAdmin as ActionIo>::encode_call(&new_admin_address)
+            }
+        }
+        impl ActionIo for AddAdmin {
+            const ROUTE: &'static [u8] = &[
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 32, 65, 100, 100, 65, 100, 109,
+                105, 110,
+            ];
+            type Params = ActorId;
+            type Reply = super::VftManagerEvents;
+        }
         pub struct AddTokensToContract(());
         impl AddTokensToContract {
             #[allow(dead_code)]
@@ -184,11 +231,41 @@ pub mod mini_de_xs {
         }
         impl ActionIo for AddTokensToContract {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 76, 65, 100, 100, 84, 111, 107, 101, 110,
-                115, 84, 111, 67, 111, 110, 116, 114, 97, 99, 116,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 76, 65, 100, 100, 84, 111, 107,
+                101, 110, 115, 84, 111, 67, 111, 110, 116, 114, 97, 99, 116,
             ];
             type Params = u128;
-            type Reply = super::MiniDexsEvents;
+            type Reply = super::VftManagerEvents;
+        }
+        pub struct BurnTokensFromContract(());
+        impl BurnTokensFromContract {
+            #[allow(dead_code)]
+            pub fn encode_call(tokens_to_burn: u128) -> Vec<u8> {
+                <BurnTokensFromContract as ActionIo>::encode_call(&tokens_to_burn)
+            }
+        }
+        impl ActionIo for BurnTokensFromContract {
+            const ROUTE: &'static [u8] = &[
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 88, 66, 117, 114, 110, 84, 111,
+                107, 101, 110, 115, 70, 114, 111, 109, 67, 111, 110, 116, 114, 97, 99, 116,
+            ];
+            type Params = u128;
+            type Reply = super::VftManagerEvents;
+        }
+        pub struct SetMaxTokensToBurn(());
+        impl SetMaxTokensToBurn {
+            #[allow(dead_code)]
+            pub fn encode_call(max_tokens_to_burn: u128) -> Vec<u8> {
+                <SetMaxTokensToBurn as ActionIo>::encode_call(&max_tokens_to_burn)
+            }
+        }
+        impl ActionIo for SetMaxTokensToBurn {
+            const ROUTE: &'static [u8] = &[
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 72, 83, 101, 116, 77, 97, 120,
+                84, 111, 107, 101, 110, 115, 84, 111, 66, 117, 114, 110,
+            ];
+            type Params = u128;
+            type Reply = super::VftManagerEvents;
         }
         pub struct SetMinTokensToAdd(());
         impl SetMinTokensToAdd {
@@ -199,11 +276,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for SetMinTokensToAdd {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 68, 83, 101, 116, 77, 105, 110, 84, 111,
-                107, 101, 110, 115, 84, 111, 65, 100, 100,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 68, 83, 101, 116, 77, 105, 110,
+                84, 111, 107, 101, 110, 115, 84, 111, 65, 100, 100,
             ];
             type Params = u128;
-            type Reply = super::MiniDexsEvents;
+            type Reply = super::VftManagerEvents;
         }
         pub struct SetTokensPerVara(());
         impl SetTokensPerVara {
@@ -214,11 +291,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for SetTokensPerVara {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 64, 83, 101, 116, 84, 111, 107, 101, 110,
-                115, 80, 101, 114, 86, 97, 114, 97,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 64, 83, 101, 116, 84, 111, 107,
+                101, 110, 115, 80, 101, 114, 86, 97, 114, 97,
             ];
             type Params = u128;
-            type Reply = super::MiniDexsEvents;
+            type Reply = super::VftManagerEvents;
         }
         pub struct SetVftContractId(());
         impl SetVftContractId {
@@ -229,11 +306,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for SetVftContractId {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 64, 83, 101, 116, 86, 102, 116, 67, 111,
-                110, 116, 114, 97, 99, 116, 73, 100,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 64, 83, 101, 116, 86, 102, 116,
+                67, 111, 110, 116, 114, 97, 99, 116, 73, 100,
             ];
             type Params = ActorId;
-            type Reply = super::MiniDexsEvents;
+            type Reply = super::VftManagerEvents;
         }
         pub struct SwapTokensByNumOfVaras(());
         impl SwapTokensByNumOfVaras {
@@ -244,11 +321,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for SwapTokensByNumOfVaras {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 88, 83, 119, 97, 112, 84, 111, 107, 101,
-                110, 115, 66, 121, 78, 117, 109, 79, 102, 86, 97, 114, 97, 115,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 88, 83, 119, 97, 112, 84, 111,
+                107, 101, 110, 115, 66, 121, 78, 117, 109, 79, 102, 86, 97, 114, 97, 115,
             ];
             type Params = ();
-            type Reply = super::MiniDexsEvents;
+            type Reply = super::VftManagerEvents;
         }
         pub struct SwapTokensToVaras(());
         impl SwapTokensToVaras {
@@ -259,11 +336,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for SwapTokensToVaras {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 68, 83, 119, 97, 112, 84, 111, 107, 101,
-                110, 115, 84, 111, 86, 97, 114, 97, 115,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 68, 83, 119, 97, 112, 84, 111,
+                107, 101, 110, 115, 84, 111, 86, 97, 114, 97, 115,
             ];
             type Params = u128;
-            type Reply = super::MiniDexsEvents;
+            type Reply = super::VftManagerEvents;
         }
         pub struct ContractTotalVarasStored(());
         impl ContractTotalVarasStored {
@@ -274,11 +351,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for ContractTotalVarasStored {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 96, 67, 111, 110, 116, 114, 97, 99, 116,
-                84, 111, 116, 97, 108, 86, 97, 114, 97, 115, 83, 116, 111, 114, 101, 100,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 96, 67, 111, 110, 116, 114, 97,
+                99, 116, 84, 111, 116, 97, 108, 86, 97, 114, 97, 115, 83, 116, 111, 114, 101, 100,
             ];
             type Params = ();
-            type Reply = super::MiniDexsQueryEvents;
+            type Reply = super::VftManagerQueryEvents;
         }
         pub struct TokensToSwapOneVara(());
         impl TokensToSwapOneVara {
@@ -289,11 +366,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for TokensToSwapOneVara {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 76, 84, 111, 107, 101, 110, 115, 84, 111,
-                83, 119, 97, 112, 79, 110, 101, 86, 97, 114, 97,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 76, 84, 111, 107, 101, 110, 115,
+                84, 111, 83, 119, 97, 112, 79, 110, 101, 86, 97, 114, 97,
             ];
             type Params = ();
-            type Reply = super::MiniDexsQueryEvents;
+            type Reply = super::VftManagerQueryEvents;
         }
         pub struct TotalTokensToSwap(());
         impl TotalTokensToSwap {
@@ -304,11 +381,11 @@ pub mod mini_de_xs {
         }
         impl ActionIo for TotalTokensToSwap {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 68, 84, 111, 116, 97, 108, 84, 111, 107,
-                101, 110, 115, 84, 111, 83, 119, 97, 112,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 68, 84, 111, 116, 97, 108, 84,
+                111, 107, 101, 110, 115, 84, 111, 83, 119, 97, 112,
             ];
             type Params = ();
-            type Reply = super::MiniDexsQueryEvents;
+            type Reply = super::VftManagerQueryEvents;
         }
         pub struct TotalTokensToSwapAsU128(());
         impl TotalTokensToSwapAsU128 {
@@ -319,35 +396,43 @@ pub mod mini_de_xs {
         }
         impl ActionIo for TotalTokensToSwapAsU128 {
             const ROUTE: &'static [u8] = &[
-                32, 77, 105, 110, 105, 68, 101, 88, 115, 92, 84, 111, 116, 97, 108, 84, 111, 107,
-                101, 110, 115, 84, 111, 83, 119, 97, 112, 65, 115, 85, 49, 50, 56,
+                40, 86, 102, 116, 77, 97, 110, 97, 103, 101, 114, 92, 84, 111, 116, 97, 108, 84,
+                111, 107, 101, 110, 115, 84, 111, 83, 119, 97, 112, 65, 115, 85, 49, 50, 56,
             ];
             type Params = ();
-            type Reply = super::MiniDexsQueryEvents;
+            type Reply = super::VftManagerQueryEvents;
         }
     }
 }
 #[derive(PartialEq, Clone, Debug, Encode, Decode, TypeInfo)]
 #[codec(crate = sails_rs::scale_codec)]
 #[scale_info(crate = sails_rs::scale_info)]
-pub enum MiniDexsEvents {
+pub enum VftManagerEvents {
+    NewAdminAdded(ActorId),
     RefundOfVaras(u128),
     VFTContractIdSet,
     MinTokensToAddSet,
+    MaxTokensToBurnSet,
     TokensAdded,
+    TokensBurned,
     SetTokensPerVaras,
     TotalSwapInVaras(u128),
     TokensSwapSuccessfully {
         total_tokens: u128,
         total_varas: u128,
     },
-    Error(MiniDexsErrors),
+    Error(VftManagerErrors),
 }
 #[derive(PartialEq, Clone, Debug, Encode, Decode, TypeInfo)]
 #[codec(crate = sails_rs::scale_codec)]
 #[scale_info(crate = sails_rs::scale_info)]
-pub enum MiniDexsErrors {
+pub enum VftManagerErrors {
     MinTokensToAdd(u128),
+    MaxTokensToBurn(u128),
+    InsufficientTokens {
+        total_contract_suply: u128,
+        tokens_to_burn: u128,
+    },
     CantSwapTokens {
         tokens_in_vft_contract: U256,
     },
@@ -360,7 +445,7 @@ pub enum MiniDexsErrors {
         min_amount: u128,
         actual_amount: u128,
     },
-    OnlyOwnerCanDoThatAction,
+    OnlyAdminsCanDoThatAction,
     VftContractIdNotSet,
     ErrorInVFTContract,
     ErrorInGetNumOfVarasToSwap,
@@ -369,7 +454,7 @@ pub enum MiniDexsErrors {
 #[derive(PartialEq, Clone, Debug, Encode, Decode, TypeInfo)]
 #[codec(crate = sails_rs::scale_codec)]
 #[scale_info(crate = sails_rs::scale_info)]
-pub enum MiniDexsQueryEvents {
+pub enum VftManagerQueryEvents {
     ContractBalanceInVaras(u128),
     UserTotalTokensAsU128(u128),
     UserTotalTokens(U256),
@@ -377,7 +462,7 @@ pub enum MiniDexsQueryEvents {
     TotalTokensToSwapAsU128(u128),
     TokensToSwapOneVara(u128),
     NumOfTokensForOneVara(u128),
-    Error(MiniDexsErrors),
+    Error(VftManagerErrors),
 }
 
 pub mod traits {
@@ -392,47 +477,60 @@ pub mod traits {
             &self,
             vft_contract_id: Option<ActorId>,
             min_tokens_to_add: u128,
+            max_tokens_to_burn: u128,
             tokens_per_vara: u128,
         ) -> impl Activation<Args = Self::Args>;
     }
 
     #[allow(clippy::type_complexity)]
-    pub trait MiniDeXs {
+    pub trait VftManager {
         type Args;
+        fn add_admin(
+            &mut self,
+            new_admin_address: ActorId,
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
         fn add_tokens_to_contract(
             &mut self,
             tokens_to_add: u128,
-        ) -> impl Call<Output = MiniDexsEvents, Args = Self::Args>;
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
+        fn burn_tokens_from_contract(
+            &mut self,
+            tokens_to_burn: u128,
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
+        fn set_max_tokens_to_burn(
+            &mut self,
+            max_tokens_to_burn: u128,
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
         fn set_min_tokens_to_add(
             &mut self,
             min_tokens_to_add: u128,
-        ) -> impl Call<Output = MiniDexsEvents, Args = Self::Args>;
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
         fn set_tokens_per_vara(
             &mut self,
             tokens_per_vara: u128,
-        ) -> impl Call<Output = MiniDexsEvents, Args = Self::Args>;
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
         fn set_vft_contract_id(
             &mut self,
             vft_contract_id: ActorId,
-        ) -> impl Call<Output = MiniDexsEvents, Args = Self::Args>;
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
         fn swap_tokens_by_num_of_varas(
             &mut self,
-        ) -> impl Call<Output = MiniDexsEvents, Args = Self::Args>;
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
         fn swap_tokens_to_varas(
             &mut self,
             amount_of_tokens: u128,
-        ) -> impl Call<Output = MiniDexsEvents, Args = Self::Args>;
+        ) -> impl Call<Output = VftManagerEvents, Args = Self::Args>;
         fn contract_total_varas_stored(
             &self,
-        ) -> impl Query<Output = MiniDexsQueryEvents, Args = Self::Args>;
+        ) -> impl Query<Output = VftManagerQueryEvents, Args = Self::Args>;
         fn tokens_to_swap_one_vara(
             &self,
-        ) -> impl Query<Output = MiniDexsQueryEvents, Args = Self::Args>;
+        ) -> impl Query<Output = VftManagerQueryEvents, Args = Self::Args>;
         fn total_tokens_to_swap(
             &self,
-        ) -> impl Query<Output = MiniDexsQueryEvents, Args = Self::Args>;
+        ) -> impl Query<Output = VftManagerQueryEvents, Args = Self::Args>;
         fn total_tokens_to_swap_as_u_128(
             &self,
-        ) -> impl Query<Output = MiniDexsQueryEvents, Args = Self::Args>;
+        ) -> impl Query<Output = VftManagerQueryEvents, Args = Self::Args>;
     }
 }

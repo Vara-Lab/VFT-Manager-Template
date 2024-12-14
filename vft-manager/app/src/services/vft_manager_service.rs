@@ -1,3 +1,6 @@
+#![allow(static_mut_refs)] // Only to avoid the static variable mut reference warning
+
+// Necesary imports
 use sails_rs::calls::{Call, Query};
 use sails_rs::{
     prelude::*,
@@ -5,25 +8,33 @@ use sails_rs::{
 };
 use gstd::exec;
 
+// Import the struct state (VFTManagerState)
 use crate::states::vft_manager_state::VFTManagerState;
+// Import the Client from the extended-vft contract (is in the clients directory)
 use crate::clients::extended_vft_client::traits::Vft;
 
+// VFTManager state
 static mut VFT_MANAGER_STATE: Option<VFTManagerState> = None;
 
-const ONE_TVARA: u128 = 1_000_000_000_000; // Value of one TVara and Vara
+// Constant ONE_TVARA, represent one VARA in Vara Network
+const ONE_TVARA: u128 = 1e12 as u128; // Value of one TVara and Vara (1_000_000_000_000)
 
+// Service struct, that specify the client to use VftClient (generic type,
+// it will take its type in the impl block)
 pub struct VFTManagerService<VftClient> {
     pub vft_client: VftClient
 }
 
-// #[service]
-impl<VftClient> VFTManagerService<VftClient> 
-where VftClient: Vft
+#[service]
+impl<VftClient> VFTManagerService<VftClient> // VFTManager service, with the extended-vft client
+where VftClient: Vft // We specify the type of the generic type (The client) to be used
 {
+    // Related function "seed", it will initiate the Service state. IMPORTANT: only call once
     pub fn seed(
         admin: ActorId,
         vft_contract_id: Option<ActorId>,
         min_tokens_to_add: u128,
+        max_tokens_to_burn: u128,
         tokens_per_vara: u128
     ) {
         unsafe {
@@ -32,12 +43,14 @@ where VftClient: Vft
                     admins: vec![admin],
                     vft_contract_id,
                     min_tokens_to_add,
+                    max_tokens_to_burn,
                     tokens_per_vara
                 }
             );
         };
     }
 
+    // Related function "new", returns a new Struct Service instance
     pub fn new(
         vft_client: VftClient
     ) -> Self {
@@ -52,7 +65,7 @@ where VftClient: Vft
         let state = self.state_mut();
         let caller = msg::source();
 
-        if state.is_admin(&caller) {
+        if !state.is_admin(&caller) {
             return VFTManagerEvents::Error(
                 VFTManagerErrors::OnlyAdminsCanDoThatAction
             );
@@ -64,12 +77,12 @@ where VftClient: Vft
     }
 
     // ## Change vft contract id
-    // Only the contract owner can perform this action
+    // Only the contract admins can perform this action
     pub fn set_vft_contract_id(&mut self, vft_contract_id: ActorId) -> VFTManagerEvents {
         let state = self.state_mut();
         let caller = msg::source();
 
-        if state.is_admin(&caller) {
+        if !state.is_admin(&caller) {
             return VFTManagerEvents::Error(
                 VFTManagerErrors::OnlyAdminsCanDoThatAction
             );
@@ -80,13 +93,30 @@ where VftClient: Vft
         VFTManagerEvents::VFTContractIdSet
     }
 
+    // ## Change the max number of tokens to burn to the contract
+    // Only the contract admins can perform this action
+    pub fn set_max_tokens_to_burn(&mut self, max_tokens_to_burn: u128) -> VFTManagerEvents {
+        let state = self.state_mut();
+        let caller = msg::source();
+
+        if !state.is_admin(&caller) {
+            return VFTManagerEvents::Error(
+                VFTManagerErrors::OnlyAdminsCanDoThatAction
+            );
+        }
+
+        state.max_tokens_to_burn = max_tokens_to_burn;
+
+        VFTManagerEvents::MaxTokensToBurnSet
+    }
+
     // ## Change the minimum number of tokens to add to the contract
-    // Only the contract owner can perform this action
+    // Only the contract admins can perform this action
     pub fn set_min_tokens_to_add(&mut self, min_tokens_to_add: u128) -> VFTManagerEvents {
         let state = self.state_mut();
         let caller = msg::source();
 
-        if state.is_admin(&caller) {
+        if !state.is_admin(&caller) {
             return VFTManagerEvents::Error(
                 VFTManagerErrors::OnlyAdminsCanDoThatAction
             );
@@ -97,13 +127,13 @@ where VftClient: Vft
         VFTManagerEvents::MinTokensToAddSet
     }
 
-    // ## Change the number of tokens to exchange for one rod
-    // Only the contract owner can perform this action
+    // ## Change the number of tokens to exchange for one VARA
+    // Only the contract admins can perform this action
     pub fn set_tokens_per_vara(&mut self, tokens_per_vara: u128) -> VFTManagerEvents {
         let state = self.state_mut();
         let caller = msg::source();
 
-        if state.is_admin(&caller) {
+        if !state.is_admin(&caller) {
             return VFTManagerEvents::Error(
                 VFTManagerErrors::OnlyAdminsCanDoThatAction
             );
@@ -114,14 +144,13 @@ where VftClient: Vft
         VFTManagerEvents::SetTokensPerVaras
     }
 
-
     // ## Add an amount of tokens to the vft contract for this contract
-    // Only the contract owner can perform this action
+    // Only the contract admins can perform this action
     pub async fn add_tokens_to_contract(&mut self, tokens_to_add: u128) ->  VFTManagerEvents {
         let state = self.state_mut();
         let caller = msg::source();
 
-        if state.is_admin(&caller) {
+        if !state.is_admin(&caller) {
             return VFTManagerEvents::Error(
                 VFTManagerErrors::OnlyAdminsCanDoThatAction
             );
@@ -153,22 +182,17 @@ where VftClient: Vft
         VFTManagerEvents::TokensAdded
     }
 
-    // ## Swap Varas for tokens
-    // Receive a certain amount of varas and then make a swap for a certain number of tokens
-    pub async fn swap_tokens_by_num_of_varas(&mut self) -> VFTManagerEvents {
-        let value = msg::value();
+    // ## Burn an amount of tokens to the vft contract for this contract
+    // Only the contract admins can perform this action
+    pub async fn burn_tokens_from_contract(&mut self, tokens_to_burn: u128) -> VFTManagerEvents {
+        let state = self.state_mut();
         let caller = msg::source();
 
-        if value == 0 {
+        if !state.is_admin(&caller) {
             return VFTManagerEvents::Error(
-                VFTManagerErrors::CantSwapTokensWithAmount {
-                    min_amount: 1,
-                    actual_amount: 0
-                }
+                VFTManagerErrors::OnlyAdminsCanDoThatAction
             );
         }
-
-        let state = self.state_ref();
 
         if state.vft_contract_id.is_none() {
             return VFTManagerEvents::Error(
@@ -176,30 +200,110 @@ where VftClient: Vft
             );
         }
 
+        if tokens_to_burn < state.max_tokens_to_burn {
+            return VFTManagerEvents::Error(
+                VFTManagerErrors::MaxTokensToBurn(state.max_tokens_to_burn)
+            );
+        }
+
+        let response = self.vft_client
+            .total_supply()
+            .recv(state.vft_contract_id.unwrap())
+            .await;
+
+        let Ok(total_contract_suply) = response else {
+            return VFTManagerEvents::Error(
+                VFTManagerErrors::VftContractIdNotSet
+            );  
+        };
+
+        if total_contract_suply < U256::from(tokens_to_burn) {
+            return VFTManagerEvents::Error(
+                VFTManagerErrors::InsufficientTokens { 
+                    total_contract_suply: total_contract_suply.as_u128(), 
+                    tokens_to_burn 
+                }
+            )
+        }
+
+        let result = self
+            .burn_num_of_tokens(tokens_to_burn, state.vft_contract_id.unwrap())
+            .await;
+
+        if let Err(error) = result {
+            return VFTManagerEvents::Error(error);
+        }
+
+        VFTManagerEvents::TokensBurned
+    }
+
+    // ## Swap Varas for tokens
+    // Receive a certain amount of varas and then make a swap for a certain number of tokens
+    // Command reply is a helper struct that can send tokens in the response from the contract
+    pub async fn swap_tokens_by_num_of_varas(&mut self) ->  CommandReply<VFTManagerEvents> {
+        let value = msg::value();
+        let caller = msg::source();
+
+        // Check if value is zero
+        if value == 0 {
+            // VFTManagerEvents::Error(
+            //     VFTManagerErrors::CantSwapTokensWithAmount {
+            //         min_amount: 1,
+            //         actual_amount: 0
+            //     }
+            // )
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::CantSwapTokensWithAmount { 
+                        min_amount: 1, 
+                        actual_amount: 0 
+                    }
+                )
+            );
+        }
+
+        let state = self.state_ref();
+
+        // If vft contract id is None, notify to the user
+        if state.vft_contract_id.is_none() {
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::VftContractIdNotSet
+                )
+            );
+        }
+
+        // We converted to a more manageable format (1 = 1_000_000_000_000)
         let num_of_tvaras = value / ONE_TVARA;
         let tokens: u128 = num_of_tvaras * state.tokens_per_vara;
 
         let total_tokens_supply = self
-            .vft_client
-            .balance_of(exec::program_id())
-            .recv(state.vft_contract_id.unwrap())
-            .await;
+            .vft_client // Set the client
+            .balance_of(exec::program_id()) // Set the method to call
+            .recv(state.vft_contract_id.unwrap()) // Call the method and wait for response
+            .await; 
 
+        // Get the total suply from caller
         let Ok(total_suply) = total_tokens_supply else {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::ErrorInVFTContract
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::ErrorInVFTContract
+                )
             );
         };
 
+        // If contract total suply is not enough, then return the tokens to the user
         if total_suply < U256::from(tokens) {
-            msg::send(
-                msg::source(),
-                VFTManagerEvents::RefundOfVaras(num_of_tvaras), 
-                value
-            )
-            .expect("Error sending message");
+            // msg::send(
+            //     msg::source(),
+            //     VFTManagerEvents::RefundOfVaras(num_of_tvaras), 
+            //     value
+            // )
+            // .expect("Error sending message");
 
-            return VFTManagerEvents::RefundOfVaras(num_of_tvaras);
+            return CommandReply::new(
+                VFTManagerEvents::RefundOfVaras(num_of_tvaras)
+            ).with_value(value);
         }
 
         let response = self
@@ -209,87 +313,117 @@ where VftClient: Vft
             .await;
 
         let Ok(transfer_status) = response else {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::ErrorInVFTContract
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::ErrorInVFTContract
+                )
             );
         };
 
         if !transfer_status {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::OperationWasNotPerformed
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::OperationWasNotPerformed
+                )
             );
         }
 
-        VFTManagerEvents::TokensSwapSuccessfully {
-            total_tokens: tokens,
-            total_varas: num_of_tvaras
-        }
+        CommandReply::new(
+            VFTManagerEvents::TokensSwapSuccessfully {
+                total_tokens: tokens,
+                total_varas: num_of_tvaras
+            }
+        )
     }
 
     /// ## Swap tokens for Varas
-    pub async fn swap_tokens_to_varas(&mut self, amount_of_tokens: u128) -> VFTManagerEvents {
+    /// CommandReply is a helper struct that can bind tokens to the response of the contract 
+    pub async fn swap_tokens_to_varas(&mut self, amount_of_tokens: u128) -> CommandReply<VFTManagerEvents> {
         let state = self.state_ref();
 
+        // If the specified tokens are not greater than the value 
+        // of a vara, the user is notified
         if amount_of_tokens < state.tokens_per_vara {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::CantSwapTokensWithAmount {
-                    min_amount: state.tokens_per_vara,
-                    actual_amount: amount_of_tokens
-                }
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::CantSwapTokensWithAmount {
+                        min_amount: state.tokens_per_vara,
+                        actual_amount: amount_of_tokens
+                    }
+                )
             );
         } 
 
+        // Get the total tokens to send (example, 100 / 50 = 2 VARAS)
         let varas_to_send = amount_of_tokens / state.tokens_per_vara;
+        // Get the real amount of tokens from user 
+        // If it sends 105, but a VARA cost 100, the real amount value is 100
         let amount_of_tokens = varas_to_send * state.tokens_per_vara;
+        // Get the total tokens to swap in 256 type
         let total_tokens_to_swap: U256 = U256::from(amount_of_tokens);
         let caller = msg::source();
 
-
+        // If vft contract is None, notify to the user
         if state.vft_contract_id.is_none() {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::VftContractIdNotSet
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::VftContractIdNotSet
+                )
             );
         }
 
         let response = self
-            .vft_client
-            .balance_of(caller)
-            .recv(state.vft_contract_id.unwrap())
+            .vft_client // Set the client
+            .balance_of(caller) // Set the method to call from the client
+            .recv(state.vft_contract_id.unwrap()) // Send and wait for response
             .await;
 
+        // Check if the response was successfull
         let Ok(user_total_tokens) = response else {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::ErrorInVFTContract
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::ErrorInVFTContract
+                )
             );
         };
 
+        // Check if the user has enough tokens
         if user_total_tokens < total_tokens_to_swap {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::CantSwapUserTokens { 
-                    user_tokens: user_total_tokens, 
-                    tokens_to_swap: total_tokens_to_swap 
-                }
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::CantSwapUserTokens { 
+                        user_tokens: user_total_tokens, 
+                        tokens_to_swap: total_tokens_to_swap 
+                    }
+                )
             );
         }
 
         let response = self
-            .vft_client
-            .burn(caller, total_tokens_to_swap)
-            .send_recv(state.vft_contract_id.unwrap())
+            .vft_client // Set the client to call
+            .burn(caller, total_tokens_to_swap) // Set the method
+            .send_recv(state.vft_contract_id.unwrap()) // Call the client and wait for response
             .await;
 
+        // Check if the response was successfully
         let Ok(operation_result) = response else {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::ErrorInVFTContract
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::ErrorInVFTContract
+                )
             );
         };
 
+        // Check if the operation was performed
         if !operation_result {
-            return VFTManagerEvents::Error(
-                VFTManagerErrors::OperationWasNotPerformed
+            return CommandReply::new(
+                VFTManagerEvents::Error(
+                    VFTManagerErrors::OperationWasNotPerformed
+                )
             );
         }
 
+        // Remove tokens from user and return that tokens to the contract
         let result = self   
             .add_num_of_tokens_to_contract(
                 amount_of_tokens, 
@@ -297,21 +431,27 @@ where VftClient: Vft
             )
             .await;
 
+        // Check if the operation was successful
         if let Err(error_variant) = result {
-            return VFTManagerEvents::Error(error_variant);
+            return CommandReply::new(
+                VFTManagerEvents::Error(error_variant)
+            );
         }
 
-        msg::send(
-            caller, 
-            VFTManagerEvents::TotalSwapInVaras(varas_to_send), 
-            varas_to_send * ONE_TVARA
-        )
-        .expect("Error sending message");
+        // msg::send(
+        //     caller, 
+        //     VFTManagerEvents::TotalSwapInVaras(varas_to_send), 
+        //     varas_to_send * ONE_TVARA
+        // )
+        // .expect("Error sending message");
 
-        VFTManagerEvents::TokensSwapSuccessfully { total_tokens: amount_of_tokens, total_varas: varas_to_send }
+        CommandReply::new(
+            VFTManagerEvents::TokensSwapSuccessfully { 
+                total_tokens: amount_of_tokens, 
+                total_varas: varas_to_send 
+            }
+        ).with_value(varas_to_send * ONE_TVARA)
     }
-
-
 
     /// ## Varas stored in contract
     pub fn contract_total_varas_stored(&self) -> VFTManagerQueryEvents {
@@ -368,6 +508,7 @@ where VftClient: Vft
         VFTManagerQueryEvents::TotalTokensToSwapAsU128(total_tokens_to_swap.as_u128())
     }
 
+    /// ## get the amount of tokens to be able to change to one VARA
     pub fn tokens_to_swap_one_vara(&self) -> VFTManagerQueryEvents {
         VFTManagerQueryEvents::TokensToSwapOneVara(self.state_ref().tokens_per_vara)
     }
@@ -389,6 +530,27 @@ where VftClient: Vft
 
         if !operation_result {
             return Err(VFTManagerErrors::OperationWasNotPerformed);
+        }
+
+        Ok(())
+    }
+
+    // ## Burn an amount of tokens to the vft contract
+    async fn burn_num_of_tokens(&mut self, tokens_to_burn: u128, vft_contract_id: ActorId) -> Result<(), VFTManagerErrors> {
+        let response = self.vft_client
+            .burn(
+                exec::program_id(), 
+                U256::from(tokens_to_burn)
+            )
+            .send_recv(vft_contract_id)
+            .await;
+
+        let Ok(result) = response else {
+            return Err(VFTManagerErrors::ErrorInVFTContract);
+        };
+
+        if !result {
+            return Err(VFTManagerErrors::OperationWasNotPerformed)
         }
 
         Ok(())
@@ -430,7 +592,9 @@ pub enum VFTManagerEvents {
     RefundOfVaras(u128),
     VFTContractIdSet,
     MinTokensToAddSet,
+    MaxTokensToBurnSet,
     TokensAdded,
+    TokensBurned,
     SetTokensPerVaras,
     TotalSwapInVaras(u128),
     TokensSwapSuccessfully {
@@ -445,6 +609,11 @@ pub enum VFTManagerEvents {
 #[scale_info(crate = sails_rs::scale_info)]
 pub enum VFTManagerErrors {
     MinTokensToAdd(u128),
+    MaxTokensToBurn(u128),
+    InsufficientTokens {
+        total_contract_suply: u128,
+        tokens_to_burn: u128
+    },
     CantSwapTokens {
         tokens_in_vft_contract: U256
     }, 
@@ -453,7 +622,7 @@ pub enum VFTManagerErrors {
         tokens_to_swap: U256
     },
     ContractCantMint,
-CantSwapTokensWithAmount {
+    CantSwapTokensWithAmount {
         min_amount: u128,
         actual_amount: u128
     },

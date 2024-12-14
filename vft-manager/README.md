@@ -91,9 +91,6 @@ impl MyProgram {
 
 With this, you set the client in the state of your contract, it helps to use less tokens in each call
 
-
-
-
 ## Using client in services
 
 In your service (in this example is in "contract_service.rs") you have to import the necessary traits to use the clints, and import the "RefMut", it is used to handle the mutable reference of each client (This is because the program will pass the client to each service as a reference):

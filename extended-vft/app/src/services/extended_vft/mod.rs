@@ -1,8 +1,9 @@
-use crate::services;
+#![allow(static_mut_refs)]
 use gstd::msg;
 use sails_rs::{collections::HashSet, gstd::service, prelude::*};
-use vft_service::{Service as VftService, Storage};
 mod funcs;
+use crate::services;
+use vft_service::{Service as VftService, Storage};
 
 #[derive(Default)]
 pub struct ExtendedStorage {
@@ -14,11 +15,12 @@ pub struct ExtendedStorage {
 static mut EXTENDED_STORAGE: Option<ExtendedStorage> = None;
 
 #[derive(Encode, Decode, TypeInfo)]
+#[codec(crate = sails_rs::scale_codec)]
+#[scale_info(crate = sails_rs::scale_info)]
 pub enum Event {
     Minted { to: ActorId, value: U256 },
     Burned { from: ActorId, value: U256 },
 }
-
 #[derive(Clone)]
 pub struct ExtendedService {
     vft: VftService,
@@ -62,7 +64,6 @@ impl ExtendedService {
             vft: VftService::new(),
         }
     }
-
     pub fn mint(&mut self, to: ActorId, value: U256) -> bool {
         if !self.get().minters.contains(&msg::source()) {
             panic!("Not allowed to mint")
@@ -71,12 +72,10 @@ impl ExtendedService {
         let mutated = services::utils::panicking(|| {
             funcs::mint(Storage::balances(), Storage::total_supply(), to, value)
         });
-
         if mutated {
             self.notify_on(Event::Minted { to, value })
                 .expect("Notification Error");
         }
-
         mutated
     }
 

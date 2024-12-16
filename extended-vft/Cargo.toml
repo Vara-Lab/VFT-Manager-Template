@@ -19,7 +19,7 @@ extended-vft-client = { path = "client" }
 sails-rs = { version = "=0.7.1", features = ["gtest"] }
 tokio = { version = "1.41", features = ["rt", "macros"] }
 gclient = "=1.7.0"
-gear-core = "=1.7.0"
+gear-core = "=1.7.0"    
 
 [features]
 wasm-binary = []

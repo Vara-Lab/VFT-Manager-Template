@@ -7,11 +7,12 @@ It controls the swap between Varas and the tokens specified on VFT contract.
 
 1. Compile both contracts.
 2. Upload the extended-vft contract to the IDEA, you have to put the necesary data for your token.
-3. Upload the mini_dexs contract, you can put an initial value for the contract (or you can put that info in each call to the contract): 
+3. Upload the vft_manager contract, you can put an initial value for the contract (or you can put that info in each call to the contract): 
     - vft_contract_id: Some or None, it is the contract if of the vft contract.
     - min_tokens_to_add: Min tokens to the contract in the vft contract.
+    - max_tokens_to_burn: Max tokens to burn from the contract.
     - tokens_per_vara: cost of tokens for a Vara (will also be used to change tokens to a Vara).
-4. In the vft contract you need to grant admin, burn and minter role to the mini_dexs contract.
+4. In the vft contract you need to grant admin, burn and minter role to the vft_manager contract.
 5. Add balance to VFT-Manager with add_tokens_to_contract function.
 6. With that, you can swap Varas and your tokens!
 
@@ -26,13 +27,26 @@ It controls the swap between Varas and the tokens specified on VFT contract.
 
 ## Step 2: Compile and Deploy the Smart Contract
 
-### Rust: You need to have rust 1.80 or newer to be able to compile your contract:
+### Rust: You need to have rust 1.83 or newer to be able to compile your contract:
 
 ```bash
-rustup install 1.81
-rustup default 1.81
+rustup install 1.83
+rustup default 1.83
 rustup target add wasm32-unknown-unknown
 ```
+
+- In case that you dont have the "wasm optimezer", you need to install the wasm-opt (to optimize WebAssembly files) with:
+
+```bash
+sudo apt install binaryen
+```
+
+- GITPOT STEP: If you were to compile the contract on gitpot, you would need to add the "rust-src" component, with:
+
+```bash
+rustup component add rust-src --toolchain 1.83-x86_64-unknown-linux-gnu
+```
+
 ### Compile the smart contract by running the following command:
 
 ```bash
